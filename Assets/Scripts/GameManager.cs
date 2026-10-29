@@ -4,6 +4,9 @@ using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
+    private const string WalletCoinsKey = "ColorDashWalletCoins";
+    private const string LifetimeCoinsKey = "ColorDashLifetimeCoins";
+
     public enum GameState
     {
         Start,
@@ -42,6 +45,10 @@ public class GameManager : MonoBehaviour
     public GameState CurrentState => currentState;
     public bool IsPlaying => currentState == GameState.Playing;
     public bool IsGameOver => currentState == GameState.GameOver;
+    public int WalletCoins => Mathf.Max(
+        PlayerPrefs.GetInt(WalletCoinsKey, 0),
+        0
+    );
 
     private int CurrentScore =>
         Mathf.FloorToInt(elapsedTime) * pointsPerSecond + coinScore;
@@ -93,26 +100,52 @@ public class GameManager : MonoBehaviour
         UpdateScoreUI();
     }
 
-    public void StartGame()
+
+public void StartGame()
+{
+    if (currentState != GameState.Start)
+        return;
+
+    SetPanel(startPanel, false);
+    SetPanel(pausePanel, false);
+    SetPanel(gameOverPanel, false);
+
+    currentState = GameState.Playing;
+    Time.timeScale = 1f;
+
+    // Bat Player va khoi dong chuyen dong
+    if (player != null)
     {
-        if (currentState != GameState.Start)
-            return;
+        player.SetActive(true);
 
-        SetPanel(startPanel, false);
-        SetPanel(pausePanel, false);
-        SetPanel(gameOverPanel, false);
+        PlayerController controller =
+            player.GetComponent<PlayerController>();
 
-        currentState = GameState.Playing;
-        Time.timeScale = 1f;
-
-        if (player != null)
-            player.SetActive(true);
-
-        if (levelGenerator != null)
-            levelGenerator.enabled = true;
-
-        UpdateScoreUI();
+        if (controller != null)
+        {
+            controller.StartGame();
+        }
+        else
+        {
+            Debug.LogError(
+                "Player chua co component PlayerController!"
+            );
+        }
     }
+    else
+    {
+        Debug.LogError(
+            "Chua gan Player trong GameManager Inspector!"
+        );
+    }
+
+    // Bat he thong sinh vat the
+    if (levelGenerator != null)
+        levelGenerator.enabled = true;
+
+    UpdateScoreUI();
+}
+
 
     public void PauseGame()
     {
@@ -186,8 +219,47 @@ public class GameManager : MonoBehaviour
         coinsCollected++;
         coinScore += pointsPerCoin;
 
+        int lifetimeCoins = PlayerPrefs.GetInt(LifetimeCoinsKey, 0) + 1;
+        PlayerPrefs.SetInt(LifetimeCoinsKey, lifetimeCoins);
+        PlayerPrefs.SetInt(WalletCoinsKey, WalletCoins + 1);
+        PlayerPrefs.Save();
+
+        if (MissionManager.Instance != null)
+            MissionManager.Instance.OnCoinCollected(lifetimeCoins);
+
         UpdateScoreUI();
         UpdateCoinUI();
+    }
+
+    public void AddBonusCoins(int amount)
+    {
+        if (amount < 0)
+        {
+            Debug.LogWarning("Cannot add a negative coin reward.");
+            return;
+        }
+
+        if (amount == 0)
+            return;
+
+        PlayerPrefs.SetInt(WalletCoinsKey, WalletCoins + amount);
+        PlayerPrefs.Save();
+    }
+
+    public bool SpendCoins(int amount)
+    {
+        if (amount < 0)
+        {
+            Debug.LogWarning("Cannot spend a negative coin amount.");
+            return false;
+        }
+
+        if (WalletCoins < amount)
+            return false;
+
+        PlayerPrefs.SetInt(WalletCoinsKey, WalletCoins - amount);
+        PlayerPrefs.Save();
+        return true;
     }
 
     private void UpdateScoreUI()

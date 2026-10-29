@@ -86,7 +86,7 @@ public class CoinSpawner : MonoBehaviour
     private void CleanupOldCoins()
     {
         Coin[] coins = FindObjectsByType<Coin>(
-            FindObjectsSortMode.None
+            FindObjectsInactive.Exclude
         );
 
         foreach (Coin coin in coins)
